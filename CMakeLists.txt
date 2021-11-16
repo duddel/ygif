@@ -48,7 +48,7 @@ list(APPEND YOURGAME_EXT_PROJ_LIST
 #   if(YES)
 # lets CMake clone the yourgame library to the requested commit (via GitHub).
 # otherwise, the original path, where this project has been initialized from, is used.
-if(NO)
+if(YES)
   if(IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/yourgamelib)
     message("${CMAKE_CURRENT_SOURCE_DIR}/yourgamelib exists, leaving unchanged")
   else()
