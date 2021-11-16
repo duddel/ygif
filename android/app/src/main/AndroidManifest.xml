@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="yourgame.project">
+
+    <application
+        android:label="ygif"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:hasCode="true">
+
+        <!-- We use an extension of the android NativeActivity, implemented in yourgame.project.MainActivity.
+        To use the unaltered android NativeActivity, set android:name="android.app.NativeActivity".
+        android:hasCode can then be "false", if there is no Kotlin/Java wrapper code -->
+        <activity
+            android:name="yourgame.project.MainActivity"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            android:configChanges="orientation|keyboardHidden|screenSize">
+            <meta-data android:name="android.app.lib_name"
+                android:value="ygif" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,0 +1,16 @@
+# assets are copied into the app by cmake (from project root)
+**/assets
+
+.cxx
+.externalNativeBuild
+build/
+*.iml
+
+.idea
+.gradle
+local.properties
+/captures
+
+# Refusing the Gradle wrapper, for now
+gradle/
+gradlew*
