@@ -1,4 +1,8 @@
-# ygif
+# ygif (YourGameLib Interface)
+
+This project evaluates how scripting `YourGameLib` could work with `Lua`.
+
+* * *
 
 This is a `YourGameLib` project, initialized from commit:
 
