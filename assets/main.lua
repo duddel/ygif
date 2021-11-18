@@ -1,8 +1,12 @@
-yg.log.debug("YGIF: debug log from Lua")
-yg.log.info("YGIF: info log from Lua")
-yg.log.warn("YGIF: warn log from Lua")
-yg.log.error("YGIF: error log from Lua")
+function init ()
+    yg.log.info("YGIF: init() called")
+end
 
-yg.control.catchMouse(true)
-yg.control.enableFullscreen(true)
+function tick ()
+--    yg.log.info("YGIF: tick() called")
+end
+
+
+--yg.control.catchMouse(true)
+--yg.control.enableFullscreen(true)
 --yg.control.exit()

@@ -28,6 +28,7 @@ extern "C"
 #include "lualib.h"
 #include "lauxlib.h"
 }
+#include "LuaBridge/LuaBridge.h"
 
 namespace yg = yourgame; // convenience
 
@@ -37,6 +38,7 @@ namespace mygame
     yg::math::Camera g_camera;
     yg::math::Trafo g_modelTrafo;
     yg::gl::Lightsource g_light;
+
     lua_State *g_Lua = nullptr;
 
     void initLua()
@@ -57,10 +59,23 @@ namespace mygame
             std::string luaCodeStr = std::string(luaCode.begin(), luaCode.end());
             luaL_dostring(g_Lua, luaCodeStr.c_str());
         }
+
+        // call init() from Lua if present
+        auto lInit = luabridge::getGlobal(g_Lua, "init");
+        if (lInit.isFunction())
+        {
+            lInit();
+        }
+        else
+        {
+            yg::log::warn("no init() found in main.lua");
+        }
     }
 
     void init(int argc, char *argv[])
     {
+        initLua();
+
         yg::log::info("project: %v (%v)", mygame::version::PROJECT_NAME, mygame::version::git_commit);
         yg::log::info("based on: %v (%v)", yg::version::PROJECT_NAME, yg::version::git_commit);
 
@@ -89,9 +104,17 @@ namespace mygame
 
     void tick()
     {
+        // reinit Lua if F5 was hit
         if (yg::input::getDelta(yg::input::KEY_F5) > 0.0f)
         {
             initLua();
+        }
+
+        // call tick() from Lua if present
+        auto lTick = luabridge::getGlobal(g_Lua, "tick");
+        if (lTick.isFunction())
+        {
+            lTick();
         }
 
         g_camera.setAspect(yg::input::get(yg::input::WINDOW_ASPECT_RATIO));
