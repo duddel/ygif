@@ -57,7 +57,10 @@ namespace mygame
         if (yg::file::readFile("a//main.lua", luaCode) == 0)
         {
             std::string luaCodeStr = std::string(luaCode.begin(), luaCode.end());
-            luaL_dostring(g_Lua, luaCodeStr.c_str());
+            if (luaL_dostring(g_Lua, luaCodeStr.c_str()) != 0)
+            {
+                yg::log::error("Lua error: %v", lua_tostring(g_Lua, -1));
+            }
         }
 
         // call init() from Lua if present
@@ -111,7 +114,10 @@ namespace mygame
         }
 
         // call tick() from Lua if present
-        auto lTick = luabridge::getGlobal(g_Lua, "tick");
+        // todo: "sometimes", getting tick() via LuaBridge causes segfault
+        // if Lua was reinitialized (close() ... newState()) before.
+        // not further investigated yet.
+        luabridge::LuaRef lTick = luabridge::getGlobal(g_Lua, "tick");
         if (lTick.isFunction())
         {
             lTick();
@@ -169,9 +175,7 @@ namespace mygame
 
     void shutdown()
     {
-        // close the Lua state
         lua_close(g_Lua);
-
         g_assets.clear();
     }
 
