@@ -130,11 +130,6 @@ namespace mygame
                    yg::input::geti(yg::input::WINDOW_HEIGHT));
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        if (yg::input::get(yg::input::KEY_ESCAPE))
-        {
-            yg::control::exit();
-        }
-
         // first-person camera
         g_camera.trafo()->rotateGlobal(static_cast<float>(yg::time::getDelta()) * 0.75f * yg::input::get(yg::input::KEY_LEFT), yg::math::Axis::Y);
         g_camera.trafo()->rotateGlobal(static_cast<float>(yg::time::getDelta()) * -0.75f * yg::input::get(yg::input::KEY_RIGHT), yg::math::Axis::Y);
