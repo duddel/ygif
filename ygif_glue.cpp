@@ -26,6 +26,10 @@ extern "C"
 #include "lauxlib.h"
 }
 #include "LuaBridge/LuaBridge.h"
+#include "LuaBridge/Array.h"
+
+// LuaBridge Stacks for glm
+#include "LuaBridge_glmVec3.h"
 
 namespace yg = yourgame; // convenience
 
@@ -79,6 +83,30 @@ namespace mygame
         return (i == str2input.end()) ? 0.0f : yg::input::getDelta(i->second);
     }
 
+    // gl ...
+    yg::gl::Shader *loadVertFragShader(std::string vertFilename, std::string fragFilename)
+    {
+        return yg::gl::loadShader({{GL_VERTEX_SHADER, vertFilename},
+                                   {GL_FRAGMENT_SHADER, fragFilename}});
+    }
+
+    void gl_draw(yg::gl::Geometry *geo,
+                 yg::gl::Lightsource *light,
+                 yg::gl::Shader *shader,
+                 yg::math::Camera *camera,
+                 yg::math::Trafo *trafo)
+    {
+        camera->setPerspective(40.0f, yg::input::get(yg::input::WINDOW_ASPECT_RATIO), 1.0f, 100.0f);
+        camera->setAspect(yg::input::get(yg::input::WINDOW_ASPECT_RATIO));
+
+        shader->useProgram(light, camera);
+        yg::gl::DrawConfig cfg;
+        cfg.camera = camera;
+        cfg.modelMat = trafo->mat();
+        cfg.shader = shader;
+        yg::gl::drawGeo(geo, cfg);
+    }
+
     void registerLua(lua_State *L)
     {
         luabridge::getGlobalNamespace(L)
@@ -103,6 +131,37 @@ namespace mygame
             .addFunction("get", input_get)
             .addFunction("geti", input_geti)
             .addFunction("getDelta", input_getDelta)
+            .endNamespace()
+            // namespace math ...
+            .beginNamespace("math")
+            .beginClass<yg::math::Trafo>("Trafo")
+            .addConstructor<void (*)()>()
+            .addFunction("setTranslation", &yg::math::Trafo::setTranslation)
+            .addFunction("lookAt", &yg::math::Trafo::lookAt)
+            .addFunction("setIdentity", &yg::math::Trafo::setIdentity)
+            .endClass()
+            .beginClass<yg::math::Camera>("Camera")
+            .addConstructor<void (*)()>()
+            .addFunction("trafo", &yg::math::Camera::trafo)
+            .addFunction("setFovy", &yg::math::Camera::setFovy)
+            .endClass()
+            .endNamespace()
+            // namespace gl ...
+            .beginNamespace("gl")
+            .addFunction("draw", gl_draw)
+            .addFunction("loadGeometry", yg::gl::loadGeometry)
+            .addFunction("loadVertFragShader", loadVertFragShader)
+            .beginClass<yg::gl::Geometry>("Geometry")
+            .endClass()
+            .beginClass<yg::gl::Lightsource>("Lightsource")
+            .addConstructor<void (*)()>()
+            .addFunction("setAmbient", &yg::gl::Lightsource::setAmbient)
+            .addFunction("setDiffuse", &yg::gl::Lightsource::setDiffuse)
+            .addFunction("setSpecular", &yg::gl::Lightsource::setSpecular)
+            .addFunction("setPosition", &yg::gl::Lightsource::setPosition)
+            .endClass()
+            .beginClass<yg::gl::Shader>("Shader")
+            .endClass()
             .endNamespace()
             // end of namespace yg
             .endNamespace();
