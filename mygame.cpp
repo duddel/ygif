@@ -89,7 +89,7 @@ namespace mygame
             initLua();
         }
 
-        // set gl for this frame (viewport from window size, and clear fl buffers)
+        // set gl for this frame (viewport from window size, and clear gl buffers)
         glViewport(0,
                    0,
                    yg::input::geti(yg::input::WINDOW_WIDTH),
@@ -100,10 +100,22 @@ namespace mygame
         // todo: "sometimes", getting tick() via LuaBridge causes segfault
         // if Lua was reinitialized (close() ... newState()) before.
         // not further investigated yet.
-        luabridge::LuaRef lTick = luabridge::getGlobal(g_Lua, "tick");
-        if (lTick.isFunction())
+        if (g_Lua != nullptr)
         {
-            lTick();
+            luabridge::LuaRef lTick = luabridge::getGlobal(g_Lua, "tick");
+            if (lTick.isFunction())
+            {
+                try
+                {
+                    lTick();
+                }
+                catch (luabridge::LuaException const &e)
+                {
+                    yg::log::error("tick(): Lua exception???: %v", std::string(e.what()));
+                    lua_close(g_Lua);
+                    g_Lua = nullptr;
+                }
+            }
         }
     }
 

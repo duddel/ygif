@@ -80,7 +80,9 @@ list(APPEND MYGAME_SRC_FILES
 )
 list(APPEND MYGAME_SRC_FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/mygame.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/ygif_glue.cpp)
+  ${CMAKE_CURRENT_SOURCE_DIR}/ygif_glue.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ygif_trafo.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ygif_camera.cpp)
 
 # inc dirs (internal)
 list(APPEND MYGAME_INC_DIRS_PRIVATE
