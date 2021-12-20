@@ -41,7 +41,8 @@ configure_file(
 
 # external projects
 list(APPEND YOURGAME_EXT_PROJ_LIST
-  "lua")
+  "lua"
+  "miniaudio")
 
 # determine the source location of the yourgame library code:
 # changing the following line to

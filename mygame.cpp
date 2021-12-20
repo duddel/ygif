@@ -34,51 +34,24 @@ namespace yg = yourgame; // convenience
 
 namespace mygame
 {
+    const std::string g_luaScriptName = "a//main.lua";
+
     lua_State *g_Lua = nullptr;
 
-    void initLua()
-    {
-        if (g_Lua != nullptr)
-        {
-            lua_close(g_Lua);
-        }
-
-        g_Lua = luaL_newstate();
-        luaL_openlibs(g_Lua);
-        mygame::registerLua(g_Lua);
-
-        // run Lua from file
-        std::vector<uint8_t> luaCode;
-        if (yg::file::readFile("a//main.lua", luaCode) == 0)
-        {
-            std::string luaCodeStr = std::string(luaCode.begin(), luaCode.end());
-            if (luaL_dostring(g_Lua, luaCodeStr.c_str()) != 0)
-            {
-                yg::log::error("Lua error: %v", lua_tostring(g_Lua, -1));
-            }
-        }
-
-        // call init() from Lua if present
-        auto lInit = luabridge::getGlobal(g_Lua, "init");
-        if (lInit.isFunction())
-        {
-            lInit();
-        }
-        else
-        {
-            yg::log::warn("no init() found in main.lua");
-        }
-    }
+    // forward declarations
+    void initLua();
+    void tickLua();
+    void shutdownLua();
 
     void init(int argc, char *argv[])
     {
-        initLua();
-
         yg::log::info("project: %v (%v)", mygame::version::PROJECT_NAME, mygame::version::git_commit);
         yg::log::info("based on: %v (%v)", yg::version::PROJECT_NAME, yg::version::git_commit);
 
         glClearColor(0.275f, 0.275f, 0.275f, 1.0f);
         glEnable(GL_DEPTH_TEST);
+
+        initLua();
     }
 
     void tick()
@@ -86,7 +59,14 @@ namespace mygame
         // reinit Lua if F5 was hit
         if (yg::input::getDelta(yg::input::KEY_F5) > 0.0f)
         {
+            shutdownLua();
             initLua();
+        }
+
+        // exit if ESCAPE was hit
+        if (yg::input::getDelta(yg::input::KEY_ESCAPE) > 0.0f)
+        {
+            yg::control::exit();
         }
 
         // set gl for this frame (viewport from window size, and clear gl buffers)
@@ -96,12 +76,63 @@ namespace mygame
                    yg::input::geti(yg::input::WINDOW_HEIGHT));
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // call tick() from Lua if present
-        // todo: "sometimes", getting tick() via LuaBridge causes segfault
-        // if Lua was reinitialized (close() ... newState()) before.
-        // not further investigated yet.
+        tickLua();
+    }
+
+    void shutdown()
+    {
+        shutdownLua();
+    }
+
+    void initLua()
+    {
+        if (g_Lua == nullptr)
+        {
+            // initialize Lua, register C++ components
+            g_Lua = luaL_newstate();
+            luaL_openlibs(g_Lua);
+            mygame::registerLua(g_Lua);
+
+            // run Lua script from file
+            std::vector<uint8_t> luaCode;
+            if (yg::file::readFile(g_luaScriptName, luaCode) == 0)
+            {
+                std::string luaCodeStr = std::string(luaCode.begin(), luaCode.end());
+                if (luaL_dostring(g_Lua, luaCodeStr.c_str()) != 0)
+                {
+                    yg::log::error("Lua error: %v", lua_tostring(g_Lua, -1));
+                    shutdownLua();
+                }
+                else
+                {
+                    // Lua: call init()
+                    luabridge::LuaRef lInit = luabridge::getGlobal(g_Lua, "init");
+                    if (lInit.isFunction())
+                    {
+                        try
+                        {
+                            lInit();
+                        }
+                        catch (luabridge::LuaException const &e)
+                        {
+                            yg::log::error("initLua(): Lua exception: %v", std::string(e.what()));
+                            shutdownLua();
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            yg::log::error("initLua(): g_Lua != nullptr");
+        }
+    }
+
+    void tickLua()
+    {
         if (g_Lua != nullptr)
         {
+            // Lua: call tick()
             luabridge::LuaRef lTick = luabridge::getGlobal(g_Lua, "tick");
             if (lTick.isFunction())
             {
@@ -111,17 +142,41 @@ namespace mygame
                 }
                 catch (luabridge::LuaException const &e)
                 {
-                    yg::log::error("tick(): Lua exception???: %v", std::string(e.what()));
-                    lua_close(g_Lua);
-                    g_Lua = nullptr;
+                    yg::log::error("tickLua(): Lua exception: %v", std::string(e.what()));
+                    shutdownLua();
                 }
             }
         }
     }
 
-    void shutdown()
+    void shutdownLua()
     {
-        lua_close(g_Lua);
-    }
+        if (g_Lua != nullptr)
+        {
+            // Lua: call shutdown()
+            // the extra scope is crucial. lShutdown has to be destroyed before
+            // lua_close() is called.
+            {
+                luabridge::LuaRef lShutdown = luabridge::getGlobal(g_Lua, "shutdown");
+                if (lShutdown.isFunction())
+                {
+                    try
+                    {
+                        lShutdown();
+                    }
+                    catch (luabridge::LuaException const &e)
+                    {
+                        yg::log::error("shutdownLua(): Lua exception: %v", std::string(e.what()));
+                    }
+                }
+            }
 
+            lua_close(g_Lua);
+            g_Lua = nullptr;
+        }
+        else
+        {
+            yg::log::error("shutdownLua(): g_Lua == nullptr");
+        }
+    }
 } // namespace mygame

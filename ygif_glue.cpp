@@ -365,6 +365,17 @@ namespace mygame
     {
         luabridge::getGlobalNamespace(L)
             .beginNamespace("yg")
+            // namespace audio ...
+            .beginNamespace("audio")
+            .addFunction("init", yg::audio::init)
+            .addFunction("shutdown", yg::audio::shutdown)
+            .addFunction("isInitialized", yg::audio::isInitialized)
+            .addFunction("storeFile", yg::audio::storeFile)
+            .addFunction("play", yg::audio::play)
+            .addFunction("stop", yg::audio::stop)
+            .addFunction("pause", yg::audio::pause)
+            .addFunction("setChannelGains", yg::audio::setChannelGains)
+            .endNamespace()
             // namespace log ...
             .beginNamespace("log")
             .addFunction("debug", log_debug)

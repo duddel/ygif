@@ -1,5 +1,5 @@
 function init()
-    yg.log.info("YGIF: init() called")
+    yg.log.info("ygif init()...")
     yg.control.enableVSync(true)
 
     -- load assets
@@ -7,6 +7,10 @@ function init()
     geoGrid = yg.gl.loadGeometry("a//grid.obj")
     shdrDiff = yg.gl.loadVertFragShader("a//default.vert", "a//diffusecolor.frag")
     shdrSimple = yg.gl.loadVertFragShader("a//default.vert", "a//simplecolor.frag")
+
+    -- initialize audio
+    yg.audio.init(2, 44100, 5)
+    yg.audio.storeFile("a//laserSmall_000.ogg")
 
     -- make camera and position it in scene
     c = yg.math.Camera()
@@ -46,6 +50,11 @@ function tick()
     cubeTrans[1] = 0; cubeTrans[2] = math.sin(yg.time.getTime() * 3) * 0.5; cubeTrans[3] = 0
     t:setTranslation(cubeTrans)
 
+    -- play audio
+    if yg.input.getDelta("KEY_SPACE") > 0.0 then
+        yg.audio.play("a//laserSmall_000.ogg")
+    end
+
     -- draw
     yg.gl.draw(geoCube, light, shdrDiff, c, t)
     yg.gl.draw(geoGrid, nil, shdrSimple, c, nil)
@@ -53,4 +62,12 @@ function tick()
     if yg.input.getDelta("KEY_ESCAPE") > 0.0 then
         yg.control.exit()
     end
+end
+
+function shutdown()
+    yg.log.info("ygif shutdown()...")
+
+    -- todo add mechanism to delete assets
+
+    yg.audio.shutdown()
 end
