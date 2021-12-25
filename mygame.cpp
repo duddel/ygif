@@ -17,10 +17,12 @@ freely, subject to the following restrictions:
    misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
 */
+#include <cstring>
 #include <vector>
 #include "yourgame/yourgame.h"
 #include "mygame_version.h"
 #include "ygif_glue.h"
+#include "imgui.h"
 
 extern "C"
 {
@@ -36,9 +38,13 @@ namespace mygame
 {
     const std::string g_luaScriptName = "a//main.lua";
 
+    std::string *g_licenseStr = nullptr;
+    char g_luaCode[500000];
+
     lua_State *g_Lua = nullptr;
 
     // forward declarations
+    void renderImgui();
     void initLua();
     void tickLua();
     void shutdownLua();
@@ -47,6 +53,21 @@ namespace mygame
     {
         yg::log::info("project: %v (%v)", mygame::version::PROJECT_NAME, mygame::version::git_commit);
         yg::log::info("based on: %v (%v)", yg::version::PROJECT_NAME, yg::version::git_commit);
+
+        // load license info file
+        {
+            std::vector<uint8_t> data;
+            yg::file::readFile("a//LICENSE_desktop.txt", data);
+            g_licenseStr = new std::string(data.begin(), data.end());
+        }
+
+        // load Lua code
+        {
+            std::vector<uint8_t> data;
+            yg::file::readFile(g_luaScriptName, data);
+            // todo check data.size() against g_luaCode size
+            std::memcpy(g_luaCode, &data[0], data.size());
+        }
 
         glClearColor(0.275f, 0.275f, 0.275f, 1.0f);
         glEnable(GL_DEPTH_TEST);
@@ -76,12 +97,59 @@ namespace mygame
                    yg::input::geti(yg::input::WINDOW_HEIGHT));
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        renderImgui();
+
         tickLua();
     }
 
     void shutdown()
     {
+        if (g_licenseStr != nullptr)
+        {
+            delete g_licenseStr;
+        }
+
         shutdownLua();
+    }
+
+    void renderImgui()
+    {
+        static bool showLicenseWindow = false;
+        if (ImGui::BeginMainMenuBar())
+        {
+            if (ImGui::BeginMenu("Help"))
+            {
+                if (ImGui::MenuItem("License"))
+                {
+                    showLicenseWindow = true;
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
+        if (showLicenseWindow)
+        {
+            ImGui::SetNextWindowSizeConstraints(ImVec2(yg::input::get(yg::input::WINDOW_WIDTH) * 0.5f,
+                                                       yg::input::get(yg::input::WINDOW_HEIGHT) * 0.5f),
+                                                ImVec2(yg::input::get(yg::input::WINDOW_WIDTH) * 0.8f,
+                                                       yg::input::get(yg::input::WINDOW_HEIGHT) * 0.8f));
+            ImGui::Begin("License", &showLicenseWindow, (ImGuiWindowFlags_NoCollapse));
+            /* The following procedure allows displaying long wrapped text,
+               whereas ImGui::TextWrapped() has a size limit and cuts the content. */
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextUnformatted(g_licenseStr->c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::End();
+        }
+
+        ImGui::Begin(g_luaScriptName.c_str(), nullptr, (0));
+        ImGui::InputTextMultiline("##source",
+                                  g_luaCode,
+                                  IM_ARRAYSIZE(g_luaCode),
+                                  ImVec2(800, 600),
+                                  ImGuiInputTextFlags_AllowTabInput);
+        ImGui::End();
     }
 
     void initLua()
@@ -93,12 +161,9 @@ namespace mygame
             luaL_openlibs(g_Lua);
             mygame::registerLua(g_Lua);
 
-            // run Lua script from file
-            std::vector<uint8_t> luaCode;
-            if (yg::file::readFile(g_luaScriptName, luaCode) == 0)
+            // run Lua code
             {
-                std::string luaCodeStr = std::string(luaCode.begin(), luaCode.end());
-                if (luaL_dostring(g_Lua, luaCodeStr.c_str()) != 0)
+                if (luaL_dostring(g_Lua, g_luaCode) != 0)
                 {
                     yg::log::error("Lua error: %v", lua_tostring(g_Lua, -1));
                     shutdownLua();
