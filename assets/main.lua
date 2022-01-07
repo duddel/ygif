@@ -2,6 +2,9 @@ function init()
     yg.log.info("ygif init()...")
     yg.control.enableVSync(true)
 
+    -- initial time
+    time0 = yg.time.getTime()
+
     -- load assets
     geoCube = yg.gl.loadGeometry("a//cube.obj")
     geoGrid = yg.gl.loadGeometry("a//grid.obj")
@@ -47,7 +50,7 @@ function tick()
     -- update cube Trafo
     t:rotateGlobal(yg.time.getDelta() * 0.2, "Y")
     cubeTrans = {}
-    cubeTrans[1] = 0; cubeTrans[2] = math.sin(yg.time.getTime() * 3) * 0.5; cubeTrans[3] = 0
+    cubeTrans[1] = 0; cubeTrans[2] = math.sin((yg.time.getTime() - time0) * 3) * 0.5; cubeTrans[3] = 0
     t:setTranslation(cubeTrans)
 
     -- play audio
