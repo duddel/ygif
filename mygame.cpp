@@ -20,6 +20,7 @@ freely, subject to the following restrictions:
 #include <algorithm> // std::replace()
 #include <cstring>
 #include <vector>
+#include <set>
 #include "yourgame/yourgame.h"
 #include "mygame_version.h"
 #include "ygif_glue.h"
@@ -58,6 +59,13 @@ namespace mygame
         }
     };
 
+    const std::set<std::string> g_excludeFiles = {
+        "./",
+        "../",
+        "LICENSE_desktop.txt",
+        "LICENSE_android.txt",
+        "LICENSE_web.txt"};
+
     // initial Lua script name to execute.
     // if project path set: try to load p//<g_luaScriptName>
     // else: try to load a//<g_luaScriptName>.
@@ -66,6 +74,8 @@ namespace mygame
     std::map<std::string, TextEditor> g_openedEditors;
     std::string *g_licenseStr = nullptr;
     lua_State *g_Lua = nullptr;
+
+    bool g_renderImgui = true;
 
     // forward declarations
     void renderImgui();
@@ -81,7 +91,13 @@ namespace mygame
         // load license info file
         {
             std::vector<uint8_t> data;
+#if defined(YOURGAME_PLATFORM_DESKTOP)
             yg::file::readFile("a//LICENSE_desktop.txt", data);
+#elif defined(YOURGAME_PLATFORM_ANDROID)
+            yg::file::readFile("a//LICENSE_android.txt", data);
+#elif defined(YOURGAME_PLATFORM_WEB)
+            yg::file::readFile("a//LICENSE_web.txt", data);
+#endif
             g_licenseStr = new std::string(data.begin(), data.end());
         }
 
@@ -106,6 +122,18 @@ namespace mygame
         {
             shutdownLua();
             initLua();
+        }
+
+        // toggle GUI
+        if (yg::input::getDelta(yg::input::KEY_TAB) > 0.0f)
+        {
+            g_renderImgui = !g_renderImgui;
+        }
+
+        // fullscreen
+        if (yg::input::getDelta(yg::input::KEY_F11) > 0.0f)
+        {
+            yg::control::enableFullscreen(!yg::input::geti(yg::input::WINDOW_FULLSCREEN));
         }
 
         // exit if ESCAPE was hit
@@ -139,14 +167,34 @@ namespace mygame
     void renderImgui()
     {
         float mainMenuBarHeight = 0.0f;
+        float sideBarHeight = 0.0f;
+
         static bool showLicenseWindow = false;
         if (ImGui::BeginMainMenuBar())
         {
             if (ImGui::BeginMenu("File"))
             {
-                if (ImGui::MenuItem("Exit"))
+                if (ImGui::MenuItem("Exit", "ESC"))
                 {
                     yg::control::exit();
+                }
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("View"))
+            {
+                ImGui::MenuItem("Render GUI", "TAB", &g_renderImgui);
+                if (ImGui::MenuItem("Fullscreen", "F11", yg::input::geti(yg::input::WINDOW_FULLSCREEN)))
+                {
+                    yg::control::enableFullscreen(!yg::input::geti(yg::input::WINDOW_FULLSCREEN));
+                }
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Run"))
+            {
+                if (ImGui::MenuItem("Reload and Start", "F5"))
+                {
+                    shutdownLua();
+                    initLua();
                 }
                 ImGui::EndMenu();
             }
@@ -160,6 +208,13 @@ namespace mygame
             }
             mainMenuBarHeight = ImGui::GetWindowSize().y;
             ImGui::EndMainMenuBar();
+        }
+
+        sideBarHeight = yg::input::get(yg::input::WINDOW_HEIGHT) - mainMenuBarHeight;
+
+        if (!g_renderImgui)
+        {
+            return;
         }
 
         if (showLicenseWindow)
@@ -190,6 +245,7 @@ namespace mygame
             }
 
             ImGui::SetNextWindowPos({0.0f, mainMenuBarHeight});
+            ImGui::SetNextWindowSizeConstraints({200.0f, sideBarHeight}, {500.0f, sideBarHeight});
             ImGui::Begin("Explorer", nullptr, (0));
 
             // lambda for button drawing, used multiple times below (collapsing headers)
@@ -197,9 +253,14 @@ namespace mygame
             {
                 for (const auto &f : filenames)
                 {
+                    if (g_excludeFiles.find(f) != g_excludeFiles.end())
+                    {
+                        continue;
+                    }
+
                     std::string file = filePrefix + f;
 
-                    if (ImGui::Button((f + "##" + filePrefix).c_str()))
+                    if (ImGui::Button((std::string("txt##") + f + filePrefix).c_str()))
                     {
                         // open new Code Editor window
                         if (g_openedEditors.find(file) == g_openedEditors.end())
@@ -223,6 +284,13 @@ namespace mygame
                             }
                         }
                     }
+                    ImGui::SameLine();
+                    if (ImGui::Button((std::string("bin##") + f + filePrefix).c_str()))
+                    {
+                        // todo not implemented
+                    }
+                    ImGui::SameLine();
+                    ImGui::Text(f.c_str());
                 }
             };
 
