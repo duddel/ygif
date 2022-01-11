@@ -17,6 +17,7 @@ freely, subject to the following restrictions:
    misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
 */
+#include <algorithm> // std::replace()
 #include <cstring>
 #include <vector>
 #include "yourgame/yourgame.h"
@@ -36,11 +37,34 @@ namespace yg = yourgame; // convenience
 
 namespace mygame
 {
-    const std::string g_luaScriptName = "a//main.lua";
+    struct TextEditor
+    {
+        char *buffer;
+        bool *winOpened;
+        enum
+        {
+            bufferSize = 250000
+        };
+        TextEditor()
+        {
+            buffer = new char[bufferSize];
+            std::memset(buffer, 0, bufferSize);
+            winOpened = new bool{true};
+        }
+        ~TextEditor()
+        {
+            delete[] buffer;
+            delete winOpened;
+        }
+    };
 
+    // initial Lua script name to execute.
+    // if project path set: try to load p//<g_luaScriptName>
+    // else: try to load a//<g_luaScriptName>.
+    std::string g_luaScriptName = "main.lua";
+
+    std::map<std::string, TextEditor> g_openedEditors;
     std::string *g_licenseStr = nullptr;
-    char g_luaCode[500000];
-
     lua_State *g_Lua = nullptr;
 
     // forward declarations
@@ -61,12 +85,12 @@ namespace mygame
             g_licenseStr = new std::string(data.begin(), data.end());
         }
 
-        // load Lua code
+        // assuming argv[1] is a path to a directory: set it as project directory
+        if (argc > 1)
         {
-            std::vector<uint8_t> data;
-            yg::file::readFile(g_luaScriptName, data);
-            // todo check data.size() against g_luaCode size
-            std::memcpy(g_luaCode, &data[0], data.size());
+            std::string projFilePathFromArgv = argv[1];
+            std::replace(projFilePathFromArgv.begin(), projFilePathFromArgv.end(), '\\', '/');
+            yg::file::setProjectPath(projFilePathFromArgv);
         }
 
         glClearColor(0.275f, 0.275f, 0.275f, 1.0f);
@@ -114,9 +138,18 @@ namespace mygame
 
     void renderImgui()
     {
+        float mainMenuBarHeight = 0.0f;
         static bool showLicenseWindow = false;
         if (ImGui::BeginMainMenuBar())
         {
+            if (ImGui::BeginMenu("File"))
+            {
+                if (ImGui::MenuItem("Exit"))
+                {
+                    yg::control::exit();
+                }
+                ImGui::EndMenu();
+            }
             if (ImGui::BeginMenu("Help"))
             {
                 if (ImGui::MenuItem("License"))
@@ -125,6 +158,7 @@ namespace mygame
                 }
                 ImGui::EndMenu();
             }
+            mainMenuBarHeight = ImGui::GetWindowSize().y;
             ImGui::EndMainMenuBar();
         }
 
@@ -143,13 +177,108 @@ namespace mygame
             ImGui::End();
         }
 
-        ImGui::Begin(g_luaScriptName.c_str(), nullptr, (0));
-        ImGui::InputTextMultiline("##source",
-                                  g_luaCode,
-                                  IM_ARRAYSIZE(g_luaCode),
-                                  ImVec2(800, 600),
-                                  ImGuiInputTextFlags_AllowTabInput);
-        ImGui::End();
+        // Explorer
+        {
+            // get asset files
+            std::vector<std::string> assetFiles = yg::file::ls("a//*");
+
+            // get project files
+            std::vector<std::string> projectFiles;
+            if (yg::file::getProjectFilePath("") != "")
+            {
+                projectFiles = yg::file::ls("p//*");
+            }
+
+            ImGui::SetNextWindowPos({0.0f, mainMenuBarHeight});
+            ImGui::Begin("Explorer", nullptr, (0));
+
+            // lambda for button drawing, used multiple times below (collapsing headers)
+            auto drawButtons = [](const std::vector<std::string> &filenames, const std::string &filePrefix)
+            {
+                for (const auto &f : filenames)
+                {
+                    std::string file = filePrefix + f;
+
+                    if (ImGui::Button((f + "##" + filePrefix).c_str()))
+                    {
+                        // open new Code Editor window
+                        if (g_openedEditors.find(file) == g_openedEditors.end())
+                        {
+                            // read file
+                            std::vector<uint8_t> data;
+                            yg::file::readFile(file, data);
+
+                            // copy file data into TextEditor buffer
+                            if (data.size() <= TextEditor::bufferSize)
+                            {
+                                // insert new default-constructed TextEditor
+                                g_openedEditors[file];
+
+                                std::memcpy(g_openedEditors[file].buffer, &data[0], data.size());
+                                yg::log::debug("Buffer filled with data: %v >= %v", TextEditor::bufferSize, data.size());
+                            }
+                            else
+                            {
+                                yg::log::warn("Buffer too small for data: %v < %v", TextEditor::bufferSize, data.size());
+                            }
+                        }
+                    }
+                }
+            };
+
+            if (ImGui::CollapsingHeader("Assets", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                drawButtons(assetFiles, "a//");
+            }
+
+            if (ImGui::CollapsingHeader("Project", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                drawButtons(projectFiles, "p//");
+            }
+
+            ImGui::End();
+        }
+
+        // Code Editor windows
+        for (const auto &w : g_openedEditors)
+        {
+            ImGui::Begin(w.first.c_str(), w.second.winOpened, (0));
+            if (ImGui::Button((std::string("save##") + w.first).c_str()))
+            {
+                // find potential zero ('\0') in text buffer and only write
+                // content before that to file
+                size_t numBytesToWrite = w.second.bufferSize;
+                for (size_t i = 0; i < w.second.bufferSize; i++)
+                {
+                    if (w.second.buffer[i] == 0)
+                    {
+                        numBytesToWrite = i;
+                        break;
+                    }
+                }
+                yg::file::writeAssetFile(yg::file::getFileName(w.first), w.second.buffer, numBytesToWrite);
+            }
+
+            ImGui::InputTextMultiline((std::string("##") + w.first).c_str(),
+                                      w.second.buffer,
+                                      w.second.bufferSize,
+                                      ImVec2(800, 600),
+                                      ImGuiInputTextFlags_AllowTabInput);
+            ImGui::End();
+        }
+
+        // remove closed Code Editor windows
+        for (auto it = g_openedEditors.cbegin(); it != g_openedEditors.cend();)
+        {
+            if (!*(it->second.winOpened))
+            {
+                it = g_openedEditors.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
     }
 
     void initLua()
@@ -163,7 +292,26 @@ namespace mygame
 
             // run Lua code
             {
-                if (luaL_dostring(g_Lua, g_luaCode) != 0)
+                // load initial Lua script from assets, or project path, if set
+                std::string luaScriptName = "a//" + g_luaScriptName;
+                if (yg::file::getProjectFilePath("") != "")
+                {
+                    luaScriptName = "p//" + g_luaScriptName;
+                }
+
+                // load lua script
+                std::vector<uint8_t> data;
+                if (yg::file::readFile(luaScriptName, data) == 0)
+                {
+                    // add null terminator for luaL_dostring()
+                    data.push_back((uint8_t)0);
+                }
+                else
+                {
+                    yg::log::error("failed to load Lua code from file %v", luaScriptName);
+                }
+
+                if (luaL_dostring(g_Lua, (char *)(&data[0])) != 0)
                 {
                     yg::log::error("Lua error: %v", lua_tostring(g_Lua, -1));
                     shutdownLua();
