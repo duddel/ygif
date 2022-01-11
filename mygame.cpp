@@ -290,7 +290,7 @@ namespace mygame
                         // todo not implemented
                     }
                     ImGui::SameLine();
-                    ImGui::Text(f.c_str());
+                    ImGui::Text("%s", f.c_str());
                 }
             };
 
