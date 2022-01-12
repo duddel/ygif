@@ -25,6 +25,7 @@ freely, subject to the following restrictions:
 #include "mygame_version.h"
 #include "ygif_glue.h"
 #include "imgui.h"
+#include "TextEditor.h"
 
 extern "C"
 {
@@ -38,23 +39,16 @@ namespace yg = yourgame; // convenience
 
 namespace mygame
 {
-    struct TextEditor
+    struct FileTextEditor
     {
-        char *buffer;
         bool *winOpened;
-        enum
+        TextEditor editor;
+        FileTextEditor()
         {
-            bufferSize = 250000
-        };
-        TextEditor()
-        {
-            buffer = new char[bufferSize];
-            std::memset(buffer, 0, bufferSize);
             winOpened = new bool{true};
         }
-        ~TextEditor()
+        ~FileTextEditor()
         {
-            delete[] buffer;
             delete winOpened;
         }
     };
@@ -71,7 +65,7 @@ namespace mygame
     // else: try to load a//<g_luaScriptName>.
     std::string g_luaScriptName = "main.lua";
 
-    std::map<std::string, TextEditor> g_openedEditors;
+    std::map<std::string, FileTextEditor> g_openedEditors;
     std::string *g_licenseStr = nullptr;
     lua_State *g_Lua = nullptr;
 
@@ -219,11 +213,10 @@ namespace mygame
 
         if (showLicenseWindow)
         {
-            ImGui::SetNextWindowSizeConstraints(ImVec2(yg::input::get(yg::input::WINDOW_WIDTH) * 0.5f,
-                                                       yg::input::get(yg::input::WINDOW_HEIGHT) * 0.5f),
-                                                ImVec2(yg::input::get(yg::input::WINDOW_WIDTH) * 0.8f,
-                                                       yg::input::get(yg::input::WINDOW_HEIGHT) * 0.8f));
             ImGui::Begin("License", &showLicenseWindow, (ImGuiWindowFlags_NoCollapse));
+            ImGui::SetWindowSize(ImVec2(yg::input::get(yg::input::WINDOW_WIDTH) * 0.5f,
+                                        yg::input::get(yg::input::WINDOW_HEIGHT) * 0.5f),
+                                 ImGuiCond_FirstUseEver);
             /* The following procedure allows displaying long wrapped text,
                whereas ImGui::TextWrapped() has a size limit and cuts the content. */
             ImGui::PushTextWrapPos(0.0f);
@@ -269,21 +262,26 @@ namespace mygame
                             std::vector<uint8_t> data;
                             yg::file::readFile(file, data);
 
-                            // copy file data into TextEditor buffer
-                            if (data.size() <= TextEditor::bufferSize)
-                            {
-                                // insert new default-constructed TextEditor
-                                g_openedEditors[file];
+                            // insert new default-constructed FileTextEditor
+                            g_openedEditors[file];
 
-                                std::memcpy(g_openedEditors[file].buffer, &data[0], data.size());
-                                yg::log::debug("Buffer filled with data: %v >= %v", TextEditor::bufferSize, data.size());
-                            }
-                            else
+                            // set editor language
+                            if (yg::file::getFileExtension(file).compare("lua") == 0)
                             {
-                                yg::log::warn("Buffer too small for data: %v < %v", TextEditor::bufferSize, data.size());
+                                g_openedEditors[file].editor.SetLanguageDefinition(TextEditor::LanguageDefinition::Lua());
                             }
+                            else if ((yg::file::getFileExtension(file).compare("vert") == 0) ||
+                                     (yg::file::getFileExtension(file).compare("frag") == 0))
+                            {
+                                g_openedEditors[file].editor.SetLanguageDefinition(TextEditor::LanguageDefinition::GLSL());
+                            }
+
+                            // fill editor with initial content
+                            std::string dataStr = std::string(data.begin(), data.end());
+                            g_openedEditors[file].editor.SetText(dataStr);
                         }
                     }
+
                     ImGui::SameLine();
                     if (ImGui::Button((std::string("bin##") + f + filePrefix).c_str()))
                     {
@@ -308,30 +306,29 @@ namespace mygame
         }
 
         // Code Editor windows
-        for (const auto &w : g_openedEditors)
+        for (auto &w : g_openedEditors)
         {
-            ImGui::Begin(w.first.c_str(), w.second.winOpened, (0));
-            if (ImGui::Button((std::string("save##") + w.first).c_str()))
+            ImGui::Begin(w.first.c_str(), w.second.winOpened,
+                         (ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_MenuBar));
+            ImGui::SetWindowSize(ImVec2(yg::input::get(yg::input::WINDOW_WIDTH) * 0.5f,
+                                        yg::input::get(yg::input::WINDOW_HEIGHT) * 0.5f),
+                                 ImGuiCond_FirstUseEver);
+
+            if (ImGui::BeginMenuBar())
             {
-                // find potential zero ('\0') in text buffer and only write
-                // content before that to file
-                size_t numBytesToWrite = w.second.bufferSize;
-                for (size_t i = 0; i < w.second.bufferSize; i++)
+                if (ImGui::BeginMenu("File"))
                 {
-                    if (w.second.buffer[i] == 0)
+                    if (ImGui::MenuItem("Save"))
                     {
-                        numBytesToWrite = i;
-                        break;
+                        std::string textToSave = w.second.editor.GetText();
+                        yg::file::writeFile(w.first, &(textToSave[0]), textToSave.size());
                     }
+                    ImGui::EndMenu();
                 }
-                yg::file::writeAssetFile(yg::file::getFileName(w.first), w.second.buffer, numBytesToWrite);
+                ImGui::EndMenuBar();
             }
 
-            ImGui::InputTextMultiline((std::string("##") + w.first).c_str(),
-                                      w.second.buffer,
-                                      w.second.bufferSize,
-                                      ImVec2(800, 600),
-                                      ImGuiInputTextFlags_AllowTabInput);
+            w.second.editor.Render("TextEditor");
             ImGui::End();
         }
 

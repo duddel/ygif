@@ -14,7 +14,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # the initial value of YOURGAME_GIT_COMMIT_REQUESTED is the commit of yourgamelib
 # during initialization of this project.
 # it should be adjusted if another (newer) version of yourgamelib is supported.
-set(YOURGAME_GIT_COMMIT_REQUESTED 284c1d08c00c9a72061d2ad6ced03b4d57b7e431)
+set(YOURGAME_GIT_COMMIT_REQUESTED 4643f27d502c05c69b89d182a890c2e86ada8c6f)
 
 # get git commit sha and test it against the requested commit of the project:
 # git describe usually returns the name of an annotated tag, but with --match="",
