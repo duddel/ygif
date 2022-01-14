@@ -25,7 +25,8 @@ freely, subject to the following restrictions:
 #include "mygame_version.h"
 #include "ygif_glue.h"
 #include "imgui.h"
-#include "TextEditor.h"
+#include "TextEditor.h" // this is ImGuiColorTextEdit
+#include "imgui_memory_editor.h"
 
 extern "C"
 {
@@ -53,6 +54,21 @@ namespace mygame
         }
     };
 
+    struct FileHexEditor
+    {
+        bool *winOpened;
+        MemoryEditor editor;
+        std::vector<uint8_t> data;
+        FileHexEditor()
+        {
+            winOpened = new bool{true};
+        }
+        ~FileHexEditor()
+        {
+            delete winOpened;
+        }
+    };
+
     const std::set<std::string> g_excludeFiles = {
         "./",
         "../",
@@ -66,6 +82,7 @@ namespace mygame
     std::string g_luaScriptName = "main.lua";
 
     std::map<std::string, FileTextEditor> g_openedEditors;
+    std::map<std::string, FileHexEditor> g_openedHexEditors;
     std::string *g_licenseStr = nullptr;
     lua_State *g_Lua = nullptr;
 
@@ -285,7 +302,11 @@ namespace mygame
                     ImGui::SameLine();
                     if (ImGui::Button((std::string("bin##") + f + filePrefix).c_str()))
                     {
-                        // todo not implemented
+                        // insert new default-constructed FileHexEditor
+                        g_openedHexEditors[file];
+
+                        // read file
+                        yg::file::readFile(file, g_openedHexEditors[file].data);
                     }
                     ImGui::SameLine();
                     ImGui::Text("%s", f.c_str());
@@ -311,7 +332,7 @@ namespace mygame
             ImGui::Begin(w.first.c_str(), w.second.winOpened,
                          (ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_MenuBar));
             ImGui::SetWindowSize(ImVec2(yg::input::get(yg::input::WINDOW_WIDTH) * 0.5f,
-                                        yg::input::get(yg::input::WINDOW_HEIGHT) * 0.5f),
+                                        yg::input::get(yg::input::WINDOW_HEIGHT) * 0.75f),
                                  ImGuiCond_FirstUseEver);
 
             if (ImGui::BeginMenuBar())
@@ -332,12 +353,51 @@ namespace mygame
             ImGui::End();
         }
 
+        // Code Hex Editor windows
+        for (auto &w : g_openedHexEditors)
+        {
+            ImGui::Begin(w.first.c_str(), w.second.winOpened,
+                         (ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_MenuBar));
+            ImGui::SetWindowSize(ImVec2(yg::input::get(yg::input::WINDOW_WIDTH) * 0.5f,
+                                        yg::input::get(yg::input::WINDOW_HEIGHT) * 0.75f),
+                                 ImGuiCond_FirstUseEver);
+
+            if (ImGui::BeginMenuBar())
+            {
+                if (ImGui::BeginMenu("File"))
+                {
+                    if (ImGui::MenuItem("Save"))
+                    {
+                        yg::file::writeFile(w.first, &(w.second.data[0]), w.second.data.size());
+                    }
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMenuBar();
+            }
+
+            w.second.editor.DrawContents(&(w.second.data[0]), w.second.data.size());
+            ImGui::End();
+        }
+
         // remove closed Code Editor windows
         for (auto it = g_openedEditors.cbegin(); it != g_openedEditors.cend();)
         {
             if (!*(it->second.winOpened))
             {
                 it = g_openedEditors.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+
+        // remove closed Code Hex Editor windows
+        for (auto it = g_openedHexEditors.cbegin(); it != g_openedHexEditors.cend();)
+        {
+            if (!*(it->second.winOpened))
+            {
+                it = g_openedHexEditors.erase(it);
             }
             else
             {
