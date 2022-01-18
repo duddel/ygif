@@ -17,6 +17,8 @@ freely, subject to the following restrictions:
    misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
 */
+#include <array>
+#include "nlohmann/json.hpp"
 #include "yourgame/yourgame.h"
 #include "ygif_trafo.h"
 #include "ygif_camera.h"
@@ -34,10 +36,13 @@ extern "C"
 #include "LuaBridge_glmVec3.h"
 #include "LuaBridge_glmQuat.h"
 
+using json = nlohmann::json;
 namespace yg = yourgame; // convenience
 
 namespace mygame
 {
+    extern json g_flavor;
+
     // log ...
     void log_debug(std::string s)
     {
@@ -361,6 +366,31 @@ namespace mygame
         yg::gl::drawGeo(geo, cfg);
     }
 
+    // flavor ...
+    std::array<float, 3> flavor_getVec3(std::string name)
+    {
+        std::array<float, 3> data{0.0f, 0.0f, 0.0f};
+        if (g_flavor.contains(name) &&
+            g_flavor[name]["type"].get<std::string>().compare("vec3") == 0)
+        {
+            data[0] = g_flavor[name]["data"][0].get<float>();
+            data[1] = g_flavor[name]["data"][1].get<float>();
+            data[2] = g_flavor[name]["data"][2].get<float>();
+        }
+        return data;
+    }
+
+    float flavor_getNumber(std::string name)
+    {
+        float data = 0.0f;
+        if (g_flavor.contains(name) &&
+            g_flavor[name]["type"].get<std::string>().compare("number") == 0)
+        {
+            data = g_flavor[name]["data"].get<float>();
+        }
+        return data;
+    }
+
     void registerLua(lua_State *L)
     {
         luabridge::getGlobalNamespace(L)
@@ -461,6 +491,11 @@ namespace mygame
             .endClass()
             .beginClass<yg::gl::Shader>("Shader")
             .endClass()
+            .endNamespace()
+            // namespace flavor ...
+            .beginNamespace("flavor")
+            .addFunction("getVec3", flavor_getVec3)
+            .addFunction("getNumber", flavor_getNumber)
             .endNamespace()
             // end of namespace yg
             .endNamespace();

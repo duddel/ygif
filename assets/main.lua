@@ -30,9 +30,6 @@ function init()
     lightPos = {}
     lightPos[1] = 4.07625; lightPos[2] = 5.90386; lightPos[3] = -1.00545
     light:setPosition(lightPos)
-    lightDiffuse = {}
-    lightDiffuse[1] = 0.6; lightDiffuse[2] = 0.8; lightDiffuse[3] = 1.0
-    light:setDiffuse(lightDiffuse)
 
     -- dummy model Trafo (identity)
     t = yg.math.Trafo()
@@ -40,6 +37,10 @@ function init()
 end
 
 function tick()
+    -- update light 
+    lightDiffuse = yg.flavor.getVec3("tint")
+    light:setDiffuse(lightDiffuse)
+
     -- update camera from input
     c:setPerspective(40, yg.input.get("WINDOW_ASPECT_RATIO"), 1, 100)
     c:trafo():rotateGlobal(yg.time.getDelta() * 0.75 * yg.input.get("KEY_LEFT"), "Y")
@@ -48,9 +49,9 @@ function tick()
     c:trafo():rotateLocal(yg.time.getDelta() * -0.75 * yg.input.get("KEY_DOWN"), "X")
 
     -- update cube Trafo
-    t:rotateGlobal(yg.time.getDelta() * 0.2, "Y")
-    cubeTrans = {}
-    cubeTrans[1] = 0; cubeTrans[2] = math.sin((yg.time.getTime() - time0) * 3) * 0.5; cubeTrans[3] = 0
+    t:rotateGlobal(yg.time.getDelta() * math.pi * 2 * yg.flavor.getNumber("rotation"), "Y")
+    cubeTrans = yg.flavor.getVec3("position")
+    cubeTrans[2] = cubeTrans[2] + math.sin((yg.time.getTime() - time0) * math.pi * 2 * yg.flavor.getNumber("bounce")) * 0.5
     t:setTranslation(cubeTrans)
 
     -- play audio
@@ -61,10 +62,6 @@ function tick()
     -- draw
     yg.gl.draw(geoCube, light, shdrDiff, c, t)
     yg.gl.draw(geoGrid, nil, shdrSimple, c, nil)
-
-    if yg.input.getDelta("KEY_ESCAPE") > 0.0 then
-        yg.control.exit()
-    end
 end
 
 function shutdown()

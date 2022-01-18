@@ -1,0 +1,29 @@
+{
+    "bounce": {
+        "type": "number",
+        "unit": "Hz",
+        "data": 0.3
+    },
+    "rotation": {
+        "type": "number",
+        "unit": "Hz",
+        "data": 0.05
+    },
+    "tint": {
+        "type": "vec3",
+        "usage": "color",
+        "data": [
+            0.4,
+            0.6,
+            0.8
+        ]
+    },
+    "position": {
+        "type": "vec3",
+        "data": [
+            0.4,
+            0.6,
+            0.8
+        ]
+    }
+}

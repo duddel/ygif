@@ -22,6 +22,7 @@ freely, subject to the following restrictions:
 #include <vector>
 #include <set>
 #include "yourgame/yourgame.h"
+#include "nlohmann/json.hpp"
 #include "mygame_version.h"
 #include "ygif_glue.h"
 #include "imgui.h"
@@ -36,6 +37,7 @@ extern "C"
 }
 #include "LuaBridge/LuaBridge.h"
 
+using json = nlohmann::json;
 namespace yg = yourgame; // convenience
 
 namespace mygame
@@ -81,10 +83,16 @@ namespace mygame
     // else: try to load a//<g_luaScriptName>.
     std::string g_luaScriptName = "main.lua";
 
+    // initial flavor to load.
+    // if project path set: try to load p//<g_flavorName>
+    // else: try to load a//<g_flavorName>.
+    std::string g_flavorName = "main_flavor.json";
+
     std::map<std::string, FileTextEditor> g_openedEditors;
     std::map<std::string, FileHexEditor> g_openedHexEditors;
     std::string *g_licenseStr = nullptr;
     lua_State *g_Lua = nullptr;
+    json g_flavor;
 
     bool g_renderImgui = true;
 
@@ -93,6 +101,7 @@ namespace mygame
     void initLua();
     void tickLua();
     void shutdownLua();
+    void loadFlavor();
 
     void init(int argc, char *argv[])
     {
@@ -123,6 +132,7 @@ namespace mygame
         glClearColor(0.275f, 0.275f, 0.275f, 1.0f);
         glEnable(GL_DEPTH_TEST);
 
+        loadFlavor();
         initLua();
     }
 
@@ -132,6 +142,7 @@ namespace mygame
         if (yg::input::getDelta(yg::input::KEY_F5) > 0.0f)
         {
             shutdownLua();
+            loadFlavor();
             initLua();
         }
 
@@ -147,12 +158,6 @@ namespace mygame
             yg::control::enableFullscreen(!yg::input::geti(yg::input::WINDOW_FULLSCREEN));
         }
 
-        // exit if ESCAPE was hit
-        if (yg::input::getDelta(yg::input::KEY_ESCAPE) > 0.0f)
-        {
-            yg::control::exit();
-        }
-
         // set gl for this frame (viewport from window size, and clear gl buffers)
         glViewport(0,
                    0,
@@ -160,7 +165,36 @@ namespace mygame
                    yg::input::geti(yg::input::WINDOW_HEIGHT));
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        renderImgui();
+        if (g_renderImgui)
+        {
+            renderImgui();
+        }
+
+        // remove closed Code Editor windows
+        for (auto it = g_openedEditors.cbegin(); it != g_openedEditors.cend();)
+        {
+            if (!*(it->second.winOpened))
+            {
+                it = g_openedEditors.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+
+        // remove closed Code Hex Editor windows
+        for (auto it = g_openedHexEditors.cbegin(); it != g_openedHexEditors.cend();)
+        {
+            if (!*(it->second.winOpened))
+            {
+                it = g_openedHexEditors.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
 
         tickLua();
     }
@@ -185,7 +219,7 @@ namespace mygame
         {
             if (ImGui::BeginMenu("File"))
             {
-                if (ImGui::MenuItem("Exit", "ESC"))
+                if (ImGui::MenuItem("Exit"))
                 {
                     yg::control::exit();
                 }
@@ -205,6 +239,7 @@ namespace mygame
                 if (ImGui::MenuItem("Reload and Start", "F5"))
                 {
                     shutdownLua();
+                    loadFlavor();
                     initLua();
                 }
                 ImGui::EndMenu();
@@ -222,11 +257,6 @@ namespace mygame
         }
 
         sideBarHeight = yg::input::get(yg::input::WINDOW_HEIGHT) - mainMenuBarHeight;
-
-        if (!g_renderImgui)
-        {
-            return;
-        }
 
         if (showLicenseWindow)
         {
@@ -326,10 +356,72 @@ namespace mygame
             ImGui::End();
         }
 
+        // Flavor Editor
+        {
+            ImGui::SetNextWindowSizeConstraints({200.0f, sideBarHeight}, {500.0f, sideBarHeight});
+            ImGui::Begin("Flavor", nullptr, (0));
+            ImGui::SetWindowPos({yg::input::get(yg::input::WINDOW_WIDTH) - ImGui::GetWindowSize().x, mainMenuBarHeight});
+
+            for (auto &el : g_flavor.items())
+            {
+                auto &v = el.value();
+
+                // todo: simplify entire json logic by validating with schema
+                if (!v.contains("type") || !v.contains("data"))
+                {
+                    continue;
+                }
+
+                std::string type = v["type"].get<std::string>();
+                std::string name = el.key();
+
+                ImGui::PushID(name.c_str());
+                if (ImGui::CollapsingHeader(name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    // todo: assuming data matches type. prefer validating with schema
+                    if (type.compare("number") == 0)
+                    {
+                        float data = v["data"].get<float>();
+
+                        std::string unit = v.contains("unit") ? v["unit"].get<std::string>() : "";
+                        ImGui::DragFloat(unit.c_str(), &data, 0.001f);
+
+                        v["data"] = data;
+                    }
+                    else if (type.compare("vec3") == 0)
+                    {
+                        float data[3];
+                        data[0] = v["data"][0].get<float>();
+                        data[1] = v["data"][1].get<float>();
+                        data[2] = v["data"][2].get<float>();
+
+                        std::string usage = v.contains("usage") ? v["usage"].get<std::string>() : "";
+                        if (usage.compare("color") == 0)
+                        {
+                            ImGui::ColorPicker3("", data);
+                        }
+                        else
+                        {
+                            ImGui::DragFloat("X", &(data[0]), 0.001f);
+                            ImGui::DragFloat("Y", &(data[1]), 0.001f);
+                            ImGui::DragFloat("Z", &(data[2]), 0.001f);
+                        }
+
+                        v["data"][0] = data[0];
+                        v["data"][1] = data[1];
+                        v["data"][2] = data[2];
+                    }
+                }
+                ImGui::PopID();
+            }
+
+            ImGui::End();
+        }
+
         // Code Editor windows
         for (auto &w : g_openedEditors)
         {
-            ImGui::Begin(w.first.c_str(), w.second.winOpened,
+            ImGui::Begin((w.first + "##txt").c_str(), w.second.winOpened,
                          (ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_MenuBar));
             ImGui::SetWindowSize(ImVec2(yg::input::get(yg::input::WINDOW_WIDTH) * 0.5f,
                                         yg::input::get(yg::input::WINDOW_HEIGHT) * 0.75f),
@@ -356,7 +448,7 @@ namespace mygame
         // Code Hex Editor windows
         for (auto &w : g_openedHexEditors)
         {
-            ImGui::Begin(w.first.c_str(), w.second.winOpened,
+            ImGui::Begin((w.first + "##hex").c_str(), w.second.winOpened,
                          (ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_MenuBar));
             ImGui::SetWindowSize(ImVec2(yg::input::get(yg::input::WINDOW_WIDTH) * 0.5f,
                                         yg::input::get(yg::input::WINDOW_HEIGHT) * 0.75f),
@@ -377,32 +469,6 @@ namespace mygame
 
             w.second.editor.DrawContents(&(w.second.data[0]), w.second.data.size());
             ImGui::End();
-        }
-
-        // remove closed Code Editor windows
-        for (auto it = g_openedEditors.cbegin(); it != g_openedEditors.cend();)
-        {
-            if (!*(it->second.winOpened))
-            {
-                it = g_openedEditors.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
-
-        // remove closed Code Hex Editor windows
-        for (auto it = g_openedHexEditors.cbegin(); it != g_openedHexEditors.cend();)
-        {
-            if (!*(it->second.winOpened))
-            {
-                it = g_openedHexEditors.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
         }
     }
 
@@ -515,6 +581,41 @@ namespace mygame
         else
         {
             yg::log::error("shutdownLua(): g_Lua == nullptr");
+        }
+    }
+
+    void loadFlavor()
+    {
+        {
+            // load initial flavor file from assets, or project path, if set
+            std::string flavorName = "a//" + g_flavorName;
+            if (yg::file::getProjectFilePath("") != "")
+            {
+                flavorName = "p//" + g_flavorName;
+            }
+
+            // load flavor file
+            std::vector<uint8_t> data;
+            if (yg::file::readFile(flavorName, data) == 0)
+            {
+                // add null terminator
+                data.push_back((uint8_t)0);
+            }
+            else
+            {
+                yg::log::error("failed to load flavor from file %v", flavorName);
+                return;
+            }
+
+            try
+            {
+                g_flavor = json::parse(&(data[0]));
+            }
+            catch (json::parse_error &e)
+            {
+                yg::log::warn("failed to parse json (flavor): %v", std::string(e.what()));
+                return;
+            }
         }
     }
 } // namespace mygame
