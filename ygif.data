@@ -30,9 +30,6 @@ function init()
     lightPos = {}
     lightPos[1] = 4.07625; lightPos[2] = 5.90386; lightPos[3] = -1.00545
     light:setPosition(lightPos)
-    lightDiffuse = {}
-    lightDiffuse[1] = 0.6; lightDiffuse[2] = 0.8; lightDiffuse[3] = 1.0
-    light:setDiffuse(lightDiffuse)
 
     -- dummy model Trafo (identity)
     t = yg.math.Trafo()
@@ -40,6 +37,10 @@ function init()
 end
 
 function tick()
+    -- update light 
+    lightDiffuse = yg.flavor.getVec3("tint")
+    light:setDiffuse(lightDiffuse)
+
     -- update camera from input
     c:setPerspective(40, yg.input.get("WINDOW_ASPECT_RATIO"), 1, 100)
     c:trafo():rotateGlobal(yg.time.getDelta() * 0.75 * yg.input.get("KEY_LEFT"), "Y")
@@ -48,9 +49,9 @@ function tick()
     c:trafo():rotateLocal(yg.time.getDelta() * -0.75 * yg.input.get("KEY_DOWN"), "X")
 
     -- update cube Trafo
-    t:rotateGlobal(yg.time.getDelta() * 0.2, "Y")
-    cubeTrans = {}
-    cubeTrans[1] = 0; cubeTrans[2] = math.sin((yg.time.getTime() - time0) * 3) * 0.5; cubeTrans[3] = 0
+    t:rotateGlobal(yg.time.getDelta() * math.pi * 2 * yg.flavor.getNumber("rotation"), "Y")
+    cubeTrans = yg.flavor.getVec3("position")
+    cubeTrans[2] = cubeTrans[2] + math.sin((yg.time.getTime() - time0) * math.pi * 2 * yg.flavor.getNumber("bounce")) * 0.5
     t:setTranslation(cubeTrans)
 
     -- play audio
@@ -61,10 +62,6 @@ function tick()
     -- draw
     yg.gl.draw(geoCube, light, shdrDiff, c, t)
     yg.gl.draw(geoGrid, nil, shdrSimple, c, nil)
-
-    if yg.input.getDelta("KEY_ESCAPE") > 0.0 then
-        yg.control.exit()
-    end
 end
 
 function shutdown()
@@ -1188,4 +1185,32 @@ r¾-©µÉ“ü‚>ìRô`3çœ‘¸õ]äÐoóÝ^6jG€Ï” ž¨Ý0øùìôý\»“"?«-Q»aðóÙéû¹v'E"~V1ÚÑ  `
 €*ÒX QŽG‚+Vl°É6ÖmÆ&Óª5«F¾-×í^ß¼c].s.uKX\,Rõ‘Z,&åëâ*osyé}õž¯Cg.®%×È»SUQUQUQ5ª’Û×åkl•*ë¬óä3Çmy{{ÝÞæ¼¯#»šlr]ÍB¾-sÎ×í•c_K¯‹m—éÔ`¨ŠbŠU¿Iô:ÎòÀ;  À8Ù½@ ¡  ¾¥ðÿÎÊÿ§ ¸7£þÿÀù@ùÿ ÷W €ÍÁÁAÌÁÁ™YŒ™™™   @”¨ €'EÅyàJ
 ñ ÄÂšÖÄF›­X³¥5K1ÅRÃL«ZÑNÑ¡S­:T~i¹UtyEŸú‹[M”:K]"S.Ö]åîîºZww'¡ë—sË/[%®Û|{›o³ï:¼
 «*Ê¼Z¿»»Z%_Y²àM¢—èít`Á %Pl4$ÄQS¥†·K‚ü4g¹ ’l°Å{aïPD>-Ü¿BLý@»qõNF÷¯S?Ðn\½ß  úÓ†-•±±ƒ‹13333“    µH VÁ¢bo¶ØªØ +)–Ã§€5±®6˜–Ö¬[3­XŠiˆŠ¨¢ QÑ*‚Š¢EQTEÕh5Vòë$S.\;!gÍ\X;?¬ÞIö'yTj¼®¦ƒµÓÁQ$äÓ]ºÀAÙMá­Öþ·8­¼Sûgßè5WH	G÷· (?+¸ì¥ô	ˆGzúw2öó­•ôv¾”²ß'œÿUŒ‘GÊ¯ŽÒ òGÀ@ ^ëüÇÅ%òEtÞ,kÿ¸¸D¾ˆÎÛåezÓÁÁÁÁAŒ˜™™‰‰™    ±ØZÅÎV­¶jƒÅ–j£Z±°Ñ´f£M¦5«ÖÄX§E§F´‚ªC§FUtjTU1ˆªðÝuõ®Ö Ö*µ«UŽ[jl£vÐ5±î½þâÌ4ŽÊ§U«{ Ôž¦0¶ì åcþ_«á½ÙlËdÒkÏ,± ¤—í:ÒÆEÒvÐvéG¿ÞúÉÐõ²oõ$ë€wŠ©FÑBj…ô`	¾ÚüÎ|!{å¸![®6ÿŸ3_È^ùnÈ–—±1›ƒƒƒ#â1111ffbf  €šbc¯öµ³µµ·6Û€6¨ia£-l4,¬bÕë"¦€…6˜VlVÁŠEET%² ‘ü:$ÜÊYIW~*#‹É—ê^{n‘ŽàF Y´(FUÄ¥ÏF2¼…€‚V0Dk–q¥´¯¡läw;ˆµ4×Ìû¼‚`Îw}”Â5Õ¯ïäx,ÝG=¨ððz9žGsç6´ªàÏ=î½0è÷tVö·Sƒ?QI þ	ýŽešN€‡Oèÿsô(Ótl8|  v vsp`ff&`f   ¨ €#Âr¤‰KˆñAX˜Öl´‚¥…©¢ Â>åê9©0Ÿ å¿K"ÂÂ_yòWu¤–KÆÈó9¾JeàÒÑE"”$Ìi“ÌŽÊð‰eö¼2–ªõñçï‚À°¹QôlGHüœ]’€“]M(ä-!€T ¾ÉüŽÞ#ù®à€ó&óÿ9zä»>€ÎOY“™E"ˆGÄÄÌLLLLÌbÌ   ÁˆXQ±VDè«ªjlUE¢†yqª-¨¢‚(çö6‚ª•²T‘Ó¦ZKË/ËñË!9ð;¾wqà„“ÎÙë«Ü¶÷ì&o‘•¥ˆ5S$˜~æï¥¿µÏéÛ/e;E§Ûú5éH@Û]F_%Õž }ON€áã¿÷ñGjBèe20É·m—,$ŽxGybýØEÀÊ@`‚ÞYü{Ì¤ÉÇ„ÎÅ¿ÇLš|L(à|m„Å–Š™™YÌÁÁÁAŒ™™™	  €a#j5m‹ÕÎ,6˜–6Y`˜6Ûh£uëVUÄÂŠ5kÖ¬¢¦¥U«Z­jD£Ñh4Š`UÕjUÕˆ¢(Š"B»ïÎ›ôÿßîJ»=+eøßv¹Òî_]Éñ¿íŠ•~ÿvWrüëY‘á÷ïr¥Ý¿ž•2üÚ.WÚýÛ])±Ög†ß¿‹Sö7RJÂßzÒ™Òú¾©`o"´ûfRJ´¿™”k=‘Î´Öœþ·•î_]Iþ·]®ôû·»Bþõ¬Ôî×vÙNþÕ•õ,-úýKùïYÑŽg‘ü‡£Zøy~(¼Ž#/ ó¡ð:ŽP¼€Î×öØ^˜©˜™™ÅˆÅ˜™™™™I  Óbg5¬vv¶6ööSÔ°jƒ-maK›l´b)˜:uèÔ¨"ªF§:´‚ªÑ©C§F+XÑj´U°¢ÕhU°¢*j'×í­÷ÝUòmöj­ä+ûëózëûsg«ósææÖ÷çÙªŸÝ­¹_Ÿ×[÷ŸÝ­Î¯ÌÍ­ïÏ­ÎÏîæÖ÷çõV¯ÖJ¾r¿>¯·ÞçN.3õ«¹ÌÔZ;[õ³»™ûõy½uÿÙÝêüÊÜÜúþÜÙêüìnn}ž­úÙÝšûõy½õ>ËVçWæ:÷ýy¶êgw3÷ýy¶êgÙšûÎœ­|fSß2N\
- 
+ {
+    "bounce": {
+        "type": "number",
+        "unit": "Hz",
+        "data": 0.3
+    },
+    "rotation": {
+        "type": "number",
+        "unit": "Hz",
+        "data": 0.05
+    },
+    "tint": {
+        "type": "vec3",
+        "usage": "color",
+        "data": [
+            0.4,
+            0.6,
+            0.8
+        ]
+    },
+    "position": {
+        "type": "vec3",
+        "data": [
+            0.4,
+            0.6,
+            0.8
+        ]
+    }
+}
